@@ -1,0 +1,59 @@
+# QuantView — Stock Price Forecasting Model
+
+# QuantView — Stock Forecasting Dashboard
+
+A stock forecasting dashboard built with Python, Flask, and Chart.js.
+
+The project explores basic quantitative finance concepts using:
+- OLS regression
+- autoregressive time-series forecasting
+- technical indicators like RSI and Bollinger Bands
+
+The dashboard supports TSX-listed equities and exposes forecast/statistics endpoints through a Flask API.
+
+Note:
+Current versions use simulated OHLCV data for testing and visualization.
+
+## Features
+- **Feature engineering**: RSI, Bollinger Bands, rolling volatility, momentum signals
+- **OLS regression** from scratch (via NumPy least squares) to predict next-day returns
+- **AR(5) autoregressive model** for multi-day price-level forecasting
+- **95% prediction intervals** via bootstrap residuals
+- **Model diagnostics**: R², RMSE, directional accuracy, Sharpe ratio
+- **REST API** (Flask) serving forecast + history endpoints
+- **Interactive dashboard** with Chart.js (price chart, MA overlays, RSI panel, forecast grid)
+
+## Setup
+
+```bash
+pip install flask flask-cors numpy pandas
+python app.py          # starts API on :5050
+open dashboard.html    # open in browser
+```
+
+> **Live data**: swap `generate_price_series()` in `forecaster.py` with `yfinance`:
+> ```python
+> import yfinance as yf
+> df = yf.download("RY.TO", period="2y", interval="1d")
+> ```
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/tickers` | List supported tickers |
+| GET | `/api/forecast/<ticker>?horizon=10` | Run forecast, return prices + CI |
+| GET | `/api/history/<ticker>?days=120` | OHLCV + technical indicators |
+| GET | `/api/stats/<ticker>` | Annualised return, vol, Sharpe, max DD |
+
+## Tickers Supported
+`RY.TO`, `SHOP.TO`, `TD.TO`, `CNR.TO`, `ENB.TO`, `BCE.TO`
+
+## Project Structure
+```
+stats-forecaster/
+├── forecaster.py    # Core models: feature engineering, OLS, AR(5), CI
+├── app.py           # Flask REST API
+├── dashboard.html   # Interactive frontend
+└── README.md
+```

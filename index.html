@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuantView — Stock Forecasting Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+:root {
+  --bg:       #ffffff;
+  --surface:  #f7f7f7;
+  --border:   #d9d9d9;
+  --text:     #111111;
+  --muted:    #6b7280;
+  --accent:   #c1121f;   /* red */
+  --accent2:  #2563eb;   /* blue */
+  --danger:   #b91c1c;
+  --warn:     #f59e0b;
+  --up:       #2563eb;   /* blue for positive */
+  --down:     #c1121f;   /* red for negative */
+}
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+  }
+
+  .logo span { color: var(--text); }
+
+  .tagline {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  /* ── Ticker Bar ── */
+  .ticker-bar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 28px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ticker-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-right: 4px;
+  }
+
+  .ticker-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 5px 12px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.15s;
+  }
+
+  .ticker-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .ticker-btn.active { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 600; }
+
+  /* ── Layout ── */
+  main { display: grid; grid-template-columns: 260px 1fr; min-height: calc(100vh - 90px); }
+
+  /* ── Sidebar ── */
+  aside {
+    border-right: 1px solid var(--border);
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px;
+  }
+
+  .stat-card h3 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    font-weight: 500;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 10px;
+  }
+
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+
+  .stat-row:last-child { border-bottom: none; }
+  .stat-row .label { color: var(--muted); }
+  .stat-row .val { font-family: 'IBM Plex Mono', monospace; font-weight: 500; }
+  .up { color: var(--up); }
+  .down { color: var(--down); }
+  .neutral { color: var(--accent2); }
+
+  .big-price {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 28px;
+    font-weight: 600;
+    color: #111111;
+    margin-bottom: 2px;
+  }
+
+  .price-change {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+  }
+
+  /* ── Chart Area ── */
+  .chart-area {
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 18px;
+  }
+
+  .panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+
+  .panel-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    padding: 3px 8px;
+    border-radius: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .badge-green { background: rgba(0,196,140,0.15); color: var(--up); border: 1px solid rgba(0,196,140,0.3); }
+  .badge-blue  { background: rgba(78,158,255,0.15); color: var(--accent2); border: 1px solid rgba(78,158,255,0.3); }
+
+  .chart-wrap { position: relative; height: 280px; }
+  .chart-wrap-sm { position: relative; height: 120px; }
+
+  /* ── Forecast Table ── */
+  .forecast-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 8px;
+  }
+
+  .fc-cell {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 10px 10px 8px;
+  }
+
+  .fc-date {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  .fc-price {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: #111111;
+  }
+
+  .fc-range {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+
+  .fc-dir { font-size: 11px; float: right; }
+
+  /* ── Controls ── */
+  .controls { display: flex; gap: 10px; align-items: center; }
+
+  .horizon-select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 5px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+
+  .btn-run {
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 6px 16px;
+    border-radius: 3px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    transition: opacity 0.15s;
+  }
+
+  .btn-run:hover { opacity: 0.85; }
+  .btn-run:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Loading ── */
+  .loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10,12,16,0.85);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    gap: 14px;
+    display: none;
+  }
+
+  .spinner {
+    width: 32px;
+    height: 32px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-text {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+  }
+
+  /* ── Model info ── */
+  .model-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .metric-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 10px;
+    text-align: center;
+  }
+
+  .metric-box .m-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 4px;
+  }
+
+  .metric-box .m-val {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loader">
+  <div class="spinner"></div>
+  <div class="loading-text">Running models...</div>
+</div>
+
+<header>
+  <div>
+    <div class="logo">QUANT<span>VIEW</span></div>
+    <div class="tagline">Stock Price Forecasting · AR(5) + OLS Regression</div>
+  </div>
+  <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted)" id="clock"></div>
+</header>
+
+<div class="ticker-bar">
+  <span class="ticker-label">Select:</span>
+  <button class="ticker-btn active" onclick="selectTicker('RY.TO', this)">RY.TO</button>
+  <button class="ticker-btn" onclick="selectTicker('SHOP.TO', this)">SHOP.TO</button>
+  <button class="ticker-btn" onclick="selectTicker('TD.TO', this)">TD.TO</button>
+  <button class="ticker-btn" onclick="selectTicker('CNR.TO', this)">CNR.TO</button>
+  <button class="ticker-btn" onclick="selectTicker('ENB.TO', this)">ENB.TO</button>
+  <button class="ticker-btn" onclick="selectTicker('BCE.TO', this)">BCE.TO</button>
+</div>
+
+<main>
+  <!-- Sidebar -->
+  <aside>
+    <div class="stat-card">
+      <h3>Price</h3>
+      <div class="big-price" id="last-price">—</div>
+      <div class="price-change" id="price-change">—</div>
+    </div>
+
+    <div class="stat-card">
+      <h3>52-Week Range</h3>
+      <div class="stat-row">
+        <span class="label">High</span>
+        <span class="val up" id="high52">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="label">Low</span>
+        <span class="val down" id="low52">—</span>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <h3>Risk / Return</h3>
+      <div class="stat-row">
+        <span class="label">Ann. Return</span>
+        <span class="val" id="ann-ret">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="label">Ann. Vol</span>
+        <span class="val" id="ann-vol">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="label">Sharpe</span>
+        <span class="val neutral" id="sharpe">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="label">Max Drawdown</span>
+        <span class="val down" id="maxdd">—</span>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <h3>Technicals</h3>
+      <div class="stat-row">
+        <span class="label">RSI (14)</span>
+        <span class="val" id="rsi">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="label">BB %</span>
+        <span class="val" id="bb-pct">—</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Charts -->
+  <div class="chart-area">
+
+    <!-- Price + Forecast chart -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Price History + Forecast</span>
+        <div class="controls">
+          <select class="horizon-select" id="horizon-sel">
+            <option value="5">5 days</option>
+            <option value="10" selected>10 days</option>
+            <option value="20">20 days</option>
+            <option value="30">30 days</option>
+          </select>
+          <button class="btn-run" id="run-btn" onclick="runForecast()">▶ Run</button>
+          <span class="badge badge-green" id="dir-acc-badge">—</span>
+        </div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="priceChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Model metrics -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Model Diagnostics</span>
+        <span class="badge badge-blue">OLS Regression</span>
+      </div>
+      <div class="model-info">
+        <div class="metric-box"><div class="m-label">R² Score</div><div class="m-val" id="r2-val">—</div></div>
+        <div class="metric-box"><div class="m-label">RMSE</div><div class="m-val" id="rmse-val">—</div></div>
+        <div class="metric-box"><div class="m-label">Dir. Accuracy</div><div class="m-val" id="diracc-val">—</div></div>
+        <div class="metric-box"><div class="m-label">Horizon</div><div class="m-val" id="horizon-val">—</div></div>
+      </div>
+    </div>
+
+    <!-- Forecast cells -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Daily Forecast + 95% CI</span>
+      </div>
+      <div class="forecast-grid" id="forecast-grid">
+        <div style="color:var(--muted);font-size:12px">Select a ticker and click ▶ Run</div>
+      </div>
+    </div>
+
+    <!-- RSI chart -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">RSI (14)</span>
+      </div>
+      <div class="chart-wrap-sm">
+        <canvas id="rsiChart"></canvas>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+const API = "http://localhost:5050";
+let currentTicker = "RY.TO";
+let priceChart = null, rsiChart = null;
+
+// ── Clock ──────────────────────────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleString('en-CA', { timeZone: 'America/Toronto', hour12: false });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ── Ticker selection ───────────────────────────────────────────────────────
+function selectTicker(ticker, btn) {
+  currentTicker = ticker;
+  document.querySelectorAll('.ticker-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  loadStats();
+  loadHistory();
+}
+
+// ── Load stats sidebar ─────────────────────────────────────────────────────
+async function loadStats() {
+  try {
+    const res = await fetch(`${API}/api/stats/${currentTicker}`);
+    const d   = await res.json();
+
+    document.getElementById('last-price').textContent = `$${d.last_close}`;
+    const retPct = (d.annualised_return * 100).toFixed(1);
+    const retClass = d.annualised_return >= 0 ? 'up' : 'down';
+    document.getElementById('price-change').innerHTML =
+      `<span class="${retClass}">${retPct >= 0 ? '+' : ''}${retPct}% ann.</span>`;
+
+    document.getElementById('high52').textContent = `$${d['52w_high']}`;
+    document.getElementById('low52').textContent  = `$${d['52w_low']}`;
+
+    document.getElementById('ann-ret').textContent = `${(d.annualised_return*100).toFixed(1)}%`;
+    document.getElementById('ann-ret').className = `val ${d.annualised_return >= 0 ? 'up' : 'down'}`;
+    document.getElementById('ann-vol').textContent = `${(d.annualised_vol*100).toFixed(1)}%`;
+    document.getElementById('sharpe').textContent  = d.sharpe_ratio.toFixed(2);
+    document.getElementById('maxdd').textContent   = `${(d.max_drawdown*100).toFixed(1)}%`;
+
+    const rsi = d.current_rsi;
+    const rsiEl = document.getElementById('rsi');
+    rsiEl.textContent = rsi.toFixed(1);
+    rsiEl.className = `val ${rsi > 70 ? 'down' : rsi < 30 ? 'up' : 'neutral'}`;
+    document.getElementById('bb-pct').textContent = `${(d.current_bb_pct*100).toFixed(0)}%`;
+  } catch(e) {
+    console.warn("Stats fetch failed — is the Flask server running?", e);
+    loadDemoStats();
+  }
+}
+
+function loadDemoStats() {
+  // Demo values when API not running
+  document.getElementById('last-price').textContent = '$142.58';
+  document.getElementById('price-change').innerHTML = '<span class="up">+8.3% ann.</span>';
+  document.getElementById('high52').textContent = '$158.20';
+  document.getElementById('low52').textContent  = '$121.45';
+  document.getElementById('ann-ret').textContent = '8.3%';
+  document.getElementById('ann-ret').className = 'val up';
+  document.getElementById('ann-vol').textContent = '19.2%';
+  document.getElementById('sharpe').textContent  = '0.43';
+  document.getElementById('maxdd').textContent   = '-14.7%';
+  document.getElementById('rsi').textContent     = '54.2';
+  document.getElementById('rsi').className = 'val neutral';
+  document.getElementById('bb-pct').textContent  = '62%';
+}
+
+// ── Load history + draw chart ──────────────────────────────────────────────
+async function loadHistory() {
+  try {
+    const res = await fetch(`${API}/api/history/${currentTicker}?days=120`);
+    const d   = await res.json();
+    drawPriceChart(d.dates, d.close, d.ma20, d.ma50, [], [], [], []);
+    drawRSIChart(d.dates, d.rsi);
+  } catch(e) {
+    loadDemoHistory();
+  }
+}
+
+function loadDemoHistory() {
+  // Generate demo data client-side
+  const n = 120;
+  const dates = [], close = [], ma20 = [], ma50 = [];
+  let p = 142;
+  const end = new Date();
+  for (let i = n; i >= 0; i--) {
+    const d = new Date(end);
+    d.setDate(d.getDate() - i);
+    if (d.getDay() === 0 || d.getDay() === 6) continue;
+    dates.push(d.toISOString().slice(0,10));
+    p *= (1 + (Math.random() - 0.49) * 0.018);
+    close.push(+p.toFixed(2));
+  }
+  // Simple MAs
+  for (let i = 0; i < close.length; i++) {
+    const slice20 = close.slice(Math.max(0, i-19), i+1);
+    const slice50 = close.slice(Math.max(0, i-49), i+1);
+    ma20.push(+(slice20.reduce((a,b)=>a+b,0)/slice20.length).toFixed(2));
+    ma50.push(+(slice50.reduce((a,b)=>a+b,0)/slice50.length).toFixed(2));
+  }
+  // Demo RSI
+  const rsi = close.map((_,i) => Math.min(80, Math.max(20, 50 + (Math.random()-0.5)*40)));
+  drawPriceChart(dates, close, ma20, ma50, [], [], [], []);
+  drawRSIChart(dates, rsi);
+}
+
+// ── Run forecast ───────────────────────────────────────────────────────────
+async function runForecast() {
+  const btn     = document.getElementById('run-btn');
+  const horizon = document.getElementById('horizon-sel').value;
+  btn.disabled  = true;
+  btn.textContent = '...';
+
+  try {
+    const [histRes, fcRes] = await Promise.all([
+      fetch(`${API}/api/history/${currentTicker}?days=120`),
+      fetch(`${API}/api/forecast/${currentTicker}?horizon=${horizon}`)
+    ]);
+    const hist = await histRes.json();
+    const fc   = await fcRes.json();
+
+    drawPriceChart(hist.dates, hist.close, hist.ma20, hist.ma50,
+                   fc.forecast_dates, fc.forecast_prices, fc.lower_ci, fc.upper_ci);
+    renderForecastGrid(fc);
+    updateModelMetrics(fc);
+  } catch(e) {
+    runDemoForecast(horizon);
+  }
+
+  btn.disabled = false;
+  btn.textContent = '▶ Run';
+}
+
+function runDemoForecast(horizon) {
+  const n = 120;
+  const dates = [], close = [];
+  let p = 142;
+  const end = new Date();
+  for (let i = n; i >= 0; i--) {
+    const d = new Date(end); d.setDate(d.getDate() - i);
+    if (d.getDay() === 0 || d.getDay() === 6) continue;
+    dates.push(d.toISOString().slice(0,10));
+    p *= (1 + (Math.random() - 0.49) * 0.018);
+    close.push(+p.toFixed(2));
+  }
+  const ma20 = close.map((_,i)=>+(close.slice(Math.max(0,i-19),i+1).reduce((a,b)=>a+b)/Math.min(20,i+1)).toFixed(2));
+  const ma50 = close.map((_,i)=>+(close.slice(Math.max(0,i-49),i+1).reduce((a,b)=>a+b)/Math.min(50,i+1)).toFixed(2));
+
+  const fcDates=[], fcPrices=[], lcis=[], ucis=[];
+  let fp = close[close.length-1];
+  const hN = parseInt(horizon)||10;
+  for(let i=0;i<hN;i++){
+    const fd=new Date(end); fd.setDate(fd.getDate()+i+1);
+    if(fd.getDay()===0) fd.setDate(fd.getDate()+1);
+    if(fd.getDay()===6) fd.setDate(fd.getDate()+2);
+    fcDates.push(fd.toISOString().slice(0,10));
+    fp *= (1 + (Math.random()-0.48)*0.012);
+    fcPrices.push(+fp.toFixed(2));
+    lcis.push(+(fp*0.97).toFixed(2));
+    ucis.push(+(fp*1.03).toFixed(2));
+  }
+
+  drawPriceChart(dates, close, ma20, ma50, fcDates, fcPrices, lcis, ucis);
+  const demoFc = {
+    forecast_dates: fcDates, forecast_prices: fcPrices,
+    lower_ci: lcis, upper_ci: ucis,
+    r2: 0.0312, rmse: 0.000842, directional_accuracy: 0.527
+  };
+  renderForecastGrid(demoFc);
+  updateModelMetrics(demoFc);
+}
+
+// ── Chart helpers ──────────────────────────────────────────────────────────
+function drawPriceChart(dates, close, ma20, ma50, fcDates, fcPrices, lci, uci) {
+  if (priceChart) priceChart.destroy();
+
+  const allDates  = [...dates, ...fcDates];
+  const closeFull = [...close, ...Array(fcDates.length).fill(null)];
+  const fcFull    = [...Array(dates.length).fill(null), ...fcPrices];
+  const lFull     = [...Array(dates.length).fill(null), ...lci];
+  const uFull     = [...Array(dates.length).fill(null), ...uci];
+
+  priceChart = new Chart(document.getElementById('priceChart'), {
+    type: 'line',
+    data: {
+      labels: allDates,
+      datasets: [
+        { label: 'Close',    data: closeFull, borderColor: '#c8cdd8', borderWidth: 1.5,  pointRadius: 0, tension: 0.3 },
+        { label: 'MA 20',    data: [...ma20, ...Array(fcDates.length).fill(null)], borderColor: '#4e9eff', borderWidth: 1, pointRadius: 0, borderDash: [4,4] },
+        { label: 'MA 50',    data: [...ma50, ...Array(fcDates.length).fill(null)], borderColor: '#f5a623', borderWidth: 1, pointRadius: 0, borderDash: [4,4] },
+        { label: 'Forecast', data: fcFull,    borderColor: '#00d4a8', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#00d4a8', tension: 0.3 },
+        { label: 'CI Upper', data: uFull,     borderColor: 'transparent', backgroundColor: 'rgba(0,212,168,0.08)', fill: '+1', pointRadius: 0 },
+        { label: 'CI Lower', data: lFull,     borderColor: 'transparent', fill: false, pointRadius: 0 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, labels: { color: '#555e72', font: { family: 'IBM Plex Mono', size: 10 }, boxWidth: 20 } },
+        tooltip: { backgroundColor: '#111318', borderColor: '#1e2330', borderWidth: 1,
+                   titleColor: '#c8cdd8', bodyColor: '#c8cdd8',
+                   titleFont: { family: 'IBM Plex Mono' }, bodyFont: { family: 'IBM Plex Mono', size: 11 } }
+      },
+      scales: {
+        x: { grid: { color: '#1e2330' }, ticks: { color: '#555e72', font: { family: 'IBM Plex Mono', size: 9 }, maxTicksLimit: 10 } },
+        y: { grid: { color: '#1e2330' }, ticks: { color: '#555e72', font: { family: 'IBM Plex Mono', size: 9 }, callback: v => `$${v}` } }
+      }
+    }
+  });
+}
+
+function drawRSIChart(dates, rsi) {
+  if (rsiChart) rsiChart.destroy();
+  rsiChart = new Chart(document.getElementById('rsiChart'), {
+    type: 'line',
+    data: {
+      labels: dates,
+      datasets: [
+        { data: rsi, borderColor: '#4e9eff', borderWidth: 1.5, pointRadius: 0, fill: false, tension: 0.3 },
+        { data: Array(dates.length).fill(70), borderColor: 'rgba(255,87,87,0.3)', borderWidth: 1, borderDash: [4,4], pointRadius: 0 },
+        { data: Array(dates.length).fill(30), borderColor: 'rgba(0,196,140,0.3)', borderWidth: 1, borderDash: [4,4], pointRadius: 0 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { display: false },
+        y: { grid: { color: '#1e2330' }, ticks: { color: '#555e72', font: { family: 'IBM Plex Mono', size: 9 } }, min: 0, max: 100 }
+      }
+    }
+  });
+}
+
+function renderForecastGrid(fc) {
+  const last = parseFloat(document.getElementById('last-price').textContent.replace('$','')) || 142;
+  const html = fc.forecast_dates.map((d, i) => {
+    const p = fc.forecast_prices[i];
+    const isUp = p >= (i === 0 ? last : fc.forecast_prices[i-1]);
+    return `
+      <div class="fc-cell">
+        <div class="fc-date">${d.slice(5)}</div>
+        <div class="fc-price">$${p.toFixed(2)} <span class="fc-dir ${isUp ? 'up' : 'down'}">${isUp ? '▲' : '▼'}</span></div>
+        <div class="fc-range">${fc.lower_ci[i].toFixed(2)} – ${fc.upper_ci[i].toFixed(2)}</div>
+      </div>`;
+  }).join('');
+  document.getElementById('forecast-grid').innerHTML = html;
+}
+
+function updateModelMetrics(fc) {
+  document.getElementById('r2-val').textContent = fc.r2?.toFixed(4) ?? '—';
+  document.getElementById('rmse-val').textContent = fc.rmse?.toFixed(5) ?? '—';
+  const da = fc.directional_accuracy;
+  const daEl = document.getElementById('diracc-val');
+  daEl.textContent = da ? `${(da*100).toFixed(1)}%` : '—';
+  daEl.style.color = da > 0.55 ? 'var(--up)' : da > 0.5 ? 'var(--accent2)' : 'var(--down)';
+  document.getElementById('horizon-val').textContent = fc.forecast_dates?.length ?? '—';
+  document.getElementById('dir-acc-badge').textContent = da ? `Dir. ${(da*100).toFixed(0)}%` : '';
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+loadStats();
+loadDemoHistory();
+</script>
+</body>
+</html>
